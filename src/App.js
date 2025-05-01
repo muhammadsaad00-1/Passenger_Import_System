@@ -1,24 +1,48 @@
-import logo from './logo.svg';
-import './App.css';
+// src/App.js
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { useThemeContext } from './contexts/ThemeContext'; // Import the hook
+import CssBaseline from '@mui/material/CssBaseline';
+import PrivateRoute from "./components/PrivateRoute";
+import Home from "./components/Home";
+import Login from "./components/auth/Login";
+import Signup from "./components/auth/Signup";
+import Dashboard from './components/Dashboard';
+import Navbar from './components/Navbar';
+import { Box } from '@mui/material';
+
+function AppWrapper() {
+  const { theme } = useThemeContext(); // Get theme from context
+  
+  return (
+    <MuiThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Navbar />
+        <Box component="main" sx={{ flexGrow: 1 }}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          </Routes>
+        </Box>
+      </Box>
+    </MuiThemeProvider>
+  );
+}
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <AuthProvider>
+        <ThemeProvider>
+          <AppWrapper />
+        </ThemeProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
