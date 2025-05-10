@@ -70,13 +70,13 @@ export function AuthProvider({ children }) {
       await setDoc(doc(db, "users", user.uid), {
         email,
         name,
-        createdAt: serverTimestamp(),
         phone: "",
         address: "",
-        requests: [],
-        travelPlans: [],
-        deliveries: [],
         availableSpace: 0,
+        requests: [],
+        deliveries: [],
+        travelPlans: [],
+        createdAt: serverTimestamp(),
         profileCompleted: false
       });
       

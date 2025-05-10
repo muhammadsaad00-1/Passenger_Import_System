@@ -1,4 +1,3 @@
-// src/models/User.js
 import { auth, db } from "../firebase";
 import { 
   doc, 
@@ -14,24 +13,35 @@ import {
 } from "firebase/firestore";
 
 export class User {
-  constructor(id, email, name, phone, address) {
-    if (new.target === User) {
-      throw new Error("Cannot instantiate abstract class User");
-    }
+  constructor(id, email, name, phone, address, requests = [], deliveries = []) {
     this.id = id;
     this.email = email;
     this.name = name;
     this.phone = phone;
     this.address = address;
+    this.requests = requests;
+    this.deliveries = deliveries;
+    
   }
 
   async updateProfile(profileData) {
     try {
       const userDocRef = doc(db, "users", this.id);
       await updateDoc(userDocRef, {
-        ...profileData,
-        updatedAt: serverTimestamp()
+        name: profileData.name,
+        phone: profileData.phone,
+        address: profileData.address,
+        availableSpace: profileData.availableSpace || 0,
+        updatedAt: serverTimestamp(),
+        profileCompleted: true
       });
+      
+      // Update local instance
+      this.name = profileData.name;
+      this.phone = profileData.phone;
+      this.address = profileData.address;
+      this.availableSpace = profileData.availableSpace || 0;
+      
       return true;
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -48,8 +58,6 @@ export class User {
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        
-        // Return a User instance with both customer and passenger capabilities
         return new User(
           auth.currentUser.uid,
           userData.email,
@@ -57,9 +65,9 @@ export class User {
           userData.phone,
           userData.address,
           userData.requests || [],
+          userData.deliveries || [],
           userData.availableSpace || 0,
-          userData.travelPlans || [],
-          userData.deliveries || []
+          userData.travelPlans || []
         );
       }
       return null;

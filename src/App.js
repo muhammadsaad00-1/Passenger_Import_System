@@ -16,6 +16,7 @@ import CreateRequest from './components/CreateRequest';
 import BrowseRequests from './components/BrowseRequest';
 import MyRequests from './components/MyRequests';
 import MyDeliveries from './components/MyDeliveries';
+import Profile from "./components/Profile";
 function AppWrapper() {
   const { theme } = useThemeContext(); // Get theme from context
   
@@ -30,6 +31,7 @@ function AppWrapper() {
   <Route path="/signup" element={<Signup />} />
   <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
   <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+  <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
   <Route path="/create-request" element={<PrivateRoute><CreateRequest /></PrivateRoute>} />
   <Route path="/browse-requests" element={<PrivateRoute><BrowseRequests /></PrivateRoute>} />
   <Route path="/my-requests" element={<PrivateRoute><MyRequests /></PrivateRoute>} />
