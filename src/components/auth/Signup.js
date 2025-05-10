@@ -4,35 +4,47 @@ import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { Button, TextField, Typography, Container, Box, Link, MenuItem } from "@mui/material";
+import {
+  Button,
+  TextField,
+  Typography,
+  Container,
+  Box,
+  Link,
+} from "@mui/material";
 
 function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [userType, setUserType] = useState("customer");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
       // Save additional user data to Firestore
       await setDoc(doc(db, "users", user.uid), {
         email,
         name,
         phone,
         address,
-        userType,
         createdAt: new Date(),
       });
-      
+
       navigate("/");
     } catch (err) {
       setError(err.message);
@@ -88,6 +100,15 @@ function Signup() {
             margin="normal"
             required
             fullWidth
+            label="Confirm Password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
             label="Phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -100,18 +121,6 @@ function Signup() {
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />
-          <TextField
-            select
-            margin="normal"
-            required
-            fullWidth
-            label="I am a"
-            value={userType}
-            onChange={(e) => setUserType(e.target.value)}
-          >
-            <MenuItem value="customer">Customer (I need to ship items)</MenuItem>
-            <MenuItem value="passenger">Passenger (I can transport items)</MenuItem>
-          </TextField>
           <Button
             type="submit"
             fullWidth
