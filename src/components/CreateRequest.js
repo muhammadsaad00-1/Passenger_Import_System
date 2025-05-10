@@ -10,15 +10,23 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  FormControl
+  FormControl,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FlightLand, LocalShipping } from '@mui/icons-material';
+import { collection, addDoc, doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 function CreateRequest() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  
   const [formData, setFormData] = useState({
     itemName: '',
     description: '',
@@ -40,9 +48,60 @@ function CreateRequest() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Connect to Firebase to save the request
-    console.log('Submitting request:', formData);
-    navigate('/dashboard');
+    
+    if (!currentUser) {
+      setError('You must be logged in to create a request');
+      setOpenSnackbar(true);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Create a new item document in the items collection
+      const itemData = {
+        ...formData,
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
+        status: 'open',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        // Convert number fields from strings to numbers
+        weight: parseFloat(formData.weight),
+        offerPrice: parseFloat(formData.offerPrice)
+      };
+      
+      // Add document to items collection
+      const itemRef = await addDoc(collection(db, "items"), itemData);
+      
+      // Add the item reference to the user's requests array
+      const userRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userRef, {
+        requests: arrayUnion({
+          itemId: itemRef.id,
+          itemName: formData.itemName,
+          createdAt: new Date().toISOString(),
+          status: 'open'
+        })
+      });
+      
+      setOpenSnackbar(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+      
+    } catch (err) {
+      console.error("Error creating request:", err);
+      setError("Failed to create request: " + err.message);
+      setOpenSnackbar(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -65,6 +124,7 @@ function CreateRequest() {
                 value={formData.itemName}
                 onChange={handleChange}
                 required
+                disabled={loading}
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -75,11 +135,12 @@ function CreateRequest() {
                 value={formData.description}
                 onChange={handleChange}
                 required
+                disabled={loading}
               />
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth disabled={loading}>
                 <InputLabel>Origin Country</InputLabel>
                 <Select
                   name="originCountry"
@@ -97,7 +158,7 @@ function CreateRequest() {
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth disabled={loading}>
                 <InputLabel>Destination Country</InputLabel>
                 <Select
                   name="destinationCountry"
@@ -122,11 +183,12 @@ function CreateRequest() {
                 value={formData.weight}
                 onChange={handleChange}
                 required
+                disabled={loading}
               />
             </Grid>
             
             <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
+              <FormControl fullWidth disabled={loading}>
                 <InputLabel>Size</InputLabel>
                 <Select
                   name="size"
@@ -142,7 +204,7 @@ function CreateRequest() {
             </Grid>
             
             <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
+              <FormControl fullWidth disabled={loading}>
                 <InputLabel>Urgency</InputLabel>
                 <Select
                   name="urgency"
@@ -166,6 +228,7 @@ function CreateRequest() {
                 value={formData.offerPrice}
                 onChange={handleChange}
                 required
+                disabled={loading}
               />
             </Grid>
             
@@ -175,6 +238,7 @@ function CreateRequest() {
                   variant="outlined" 
                   onClick={() => navigate('/dashboard')}
                   sx={{ px: 4 }}
+                  disabled={loading}
                 >
                   Cancel
                 </Button>
@@ -183,14 +247,30 @@ function CreateRequest() {
                   variant="contained" 
                   sx={{ px: 4 }}
                   startIcon={<LocalShipping />}
+                  disabled={loading}
                 >
-                  Submit Request
+                  {loading ? 'Submitting...' : 'Submit Request'}
                 </Button>
               </Box>
             </Grid>
           </Grid>
         </form>
       </Paper>
+
+      <Snackbar 
+        open={openSnackbar} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={error ? "error" : "success"} 
+          sx={{ width: '100%' }}
+        >
+          {error || "Request created successfully!"}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

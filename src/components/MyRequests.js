@@ -11,49 +11,96 @@ import {
   Paper,
   Tabs,
   Tab,
-  Button  // Added this import
+  Button,
+  CircularProgress
 } from '@mui/material';
 import { FlightLand, LocalShipping, CheckCircle, HourglassEmpty } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 function MyRequests() {
   const { currentUser } = useAuth();
   const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
 
-  // TODO: Replace with actual data fetching from Firebase
   useEffect(() => {
-    // Mock data
-    const mockRequests = [
-      {
-        id: '1',
-        itemName: 'iPhone 14 Pro',
-        status: 'pending',
-        originCountry: 'USA',
-        destinationCountry: 'PK',
-        offerPrice: 50,
-        createdAt: new Date()
-      },
-      {
-        id: '2',
-        itemName: 'Designer Handbag',
-        status: 'accepted',
-        originCountry: 'UK',
-        destinationCountry: 'PK',
-        offerPrice: 80,
-        travelerName: 'John Doe',
-        travelerContact: 'john@example.com',
-        createdAt: new Date()
+    const fetchRequests = async () => {
+      if (!currentUser) return;
+      
+      try {
+        setLoading(true);
+        const itemsCollection = collection(db, 'items');
+        const q = query(itemsCollection, where('userId', '==', currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        
+        const requestsData = [];
+        querySnapshot.forEach((doc) => {
+          requestsData.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+        
+        setRequests(requestsData);
+      } catch (error) {
+        console.error('Error fetching requests:', error);
+      } finally {
+        setLoading(false);
       }
-    ];
-    setRequests(mockRequests);
-  }, []);
+    };
+
+    fetchRequests();
+  }, [currentUser]);
 
   const filteredRequests = requests.filter(request => {
-    if (tabValue === 0) return request.status === 'pending';
-    if (tabValue === 1) return request.status === 'accepted';
+    if (tabValue === 0) return request.status === 'open';
+    if (tabValue === 1) return request.status === 'assigned' || request.status === 'in-transit';
     return true;
   });
+
+  const getStatusLabel = (status) => {
+    switch(status) {
+      case 'open':
+        return 'Pending';
+      case 'assigned':
+        return 'Accepted';
+      case 'in-transit':
+        return 'In Transit';
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'open':
+        return 'default';
+      case 'assigned':
+        return 'primary';
+      case 'in-transit':
+        return 'secondary';
+      case 'delivered':
+        return 'success';
+      case 'cancelled':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 6, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 6 }}>
@@ -72,7 +119,7 @@ function MyRequests() {
           textColor="primary"
         >
           <Tab label="Pending" icon={<HourglassEmpty />} iconPosition="start" />
-          <Tab label="Accepted" icon={<CheckCircle />} iconPosition="start" />
+          <Tab label="Active" icon={<CheckCircle />} iconPosition="start" />
         </Tabs>
       </Paper>
 
@@ -87,8 +134,8 @@ function MyRequests() {
                       {request.itemName}
                     </Typography>
                     <Chip 
-                      label={request.status === 'pending' ? 'Pending' : 'Accepted'} 
-                      color={request.status === 'pending' ? 'default' : 'primary'} 
+                      label={getStatusLabel(request.status)} 
+                      color={getStatusColor(request.status)} 
                     />
                   </Box>
                   
@@ -119,25 +166,37 @@ function MyRequests() {
                     </Grid>
                     <Grid item xs={6} sm={3}>
                       <Typography variant="caption" display="block" color="text.secondary">
-                        Status
+                        Weight
                       </Typography>
                       <Typography variant="body2">
-                        {request.status}
+                        {request.weight} kg
                       </Typography>
                     </Grid>
                   </Grid>
                   
-                  {request.status === 'accepted' && (
+                  {request.description && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Description:
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 2 }}>
+                        {request.description}
+                      </Typography>
+                    </>
+                  )}
+                  
+                  {(request.status === 'assigned' || request.status === 'in-transit') && (
                     <>
                       <Divider sx={{ my: 2 }} />
                       <Typography variant="subtitle2" sx={{ mb: 1 }}>
                         Traveler Details:
                       </Typography>
                       <Typography variant="body2">
-                        Name: {request.travelerName}
+                        Name: {request.assignedToName || 'Not specified'}
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 2 }}>
-                        Contact: {request.travelerContact}
+                        Contact: {request.assignedToEmail || 'Not specified'}
                       </Typography>
                     </>
                   )}
@@ -151,7 +210,7 @@ function MyRequests() {
               <Typography variant="body1" sx={{ mb: 2 }}>
                 {tabValue === 0 
                   ? "You don't have any pending requests."
-                  : "You don't have any accepted requests."}
+                  : "You don't have any active requests."}
               </Typography>
               {tabValue === 0 && (
                 <Button 
