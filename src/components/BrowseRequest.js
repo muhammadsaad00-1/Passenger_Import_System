@@ -1,25 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Container, 
-  Typography, 
-  Grid, 
-  Card, 
-  CardContent, 
-  Button,
-  Box,
-  Chip,
-  Divider,
-  Paper,
-  TextField,
-  InputAdornment,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel
+  Container, Typography, Grid, Card, CardContent, Button,
+  Box, Chip, Divider, Paper, TextField, InputAdornment,
+  Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
-import { Search, FlightLand, LocalShipping } from '@mui/icons-material';
+import { FlightLand, LocalShipping } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { collection, getDocs, query,where } from 'firebase/firestore';
+import { db } from '../firebase'; // adjust path if needed
 
 function BrowseRequests() {
   const { currentUser } = useAuth();
@@ -31,39 +20,30 @@ function BrowseRequests() {
     maxWeight: ''
   });
 
-  // TODO: Replace with actual data fetching from Firebase
   useEffect(() => {
-    // Mock data
-    const mockRequests = [
-      {
-        id: '1',
-        itemName: 'iPhone 14 Pro',
-        description: 'New iPhone in original packaging',
-        originCountry: 'USA',
-        destinationCountry: 'PK',
-        weight: 0.5,
-        size: 'small',
-        urgency: 'standard',
-        offerPrice: 50,
-        requesterId: 'user1',
-        createdAt: new Date()
-      },
-      {
-        id: '2',
-        itemName: 'Designer Handbag',
-        description: 'Louis Vuitton Neverfull MM',
-        originCountry: 'UK',
-        destinationCountry: 'PK',
-        weight: 1.2,
-        size: 'small',
-        urgency: 'express',
-        offerPrice: 80,
-        requesterId: 'user2',
-        createdAt: new Date()
-      }
-    ];
-    setRequests(mockRequests);
-  }, []);
+  const fetchRequests = async () => {
+    try {
+      const q = query(collection(db, 'items'), where('status', '==', 'open'));
+      const querySnapshot = await getDocs(q);
+      const data = [];
+
+      querySnapshot.forEach(doc => {
+        const request = doc.data();
+        if (request.userEmail !== currentUser?.email) {
+          data.push({ id: doc.id, ...request });
+        }
+      });
+
+      setRequests(data);
+    } catch (err) {
+      console.error('Error fetching requests from Firestore:', err);
+    }
+  };
+
+  if (currentUser) {
+    fetchRequests();
+  }
+}, [currentUser]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -74,10 +54,17 @@ function BrowseRequests() {
   };
 
   const handleAcceptRequest = (requestId) => {
-    // TODO: Connect to Firebase to update request status
+    // Placeholder for accept logic
     console.log('Accepting request:', requestId);
-    navigate('/my-deliveries');
   };
+
+  const filteredRequests = requests.filter(req => {
+    return (
+      (!filters.originCountry || req.originCountry === filters.originCountry) &&
+      (!filters.destinationCountry || req.destinationCountry === filters.destinationCountry) &&
+      (!filters.maxWeight || req.weight <= parseFloat(filters.maxWeight))
+    );
+  });
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 6 }}>
@@ -96,6 +83,7 @@ function BrowseRequests() {
               <InputLabel>Origin Country</InputLabel>
               <Select
                 name="originCountry"
+                label="Origin Country"
                 value={filters.originCountry}
                 onChange={handleFilterChange}
               >
@@ -111,6 +99,7 @@ function BrowseRequests() {
               <InputLabel>Destination Country</InputLabel>
               <Select
                 name="destinationCountry"
+                label="Destination Country"
                 value={filters.destinationCountry}
                 onChange={handleFilterChange}
               >
@@ -139,7 +128,7 @@ function BrowseRequests() {
 
       {/* Requests List */}
       <Grid container spacing={3}>
-        {requests.map((request) => (
+        {filteredRequests.map((request) => (
           <Grid item xs={12} key={request.id}>
             <Card sx={{ 
               border: '1px solid rgba(0, 0, 0, 0.12)',
@@ -160,13 +149,13 @@ function BrowseRequests() {
                     variant="outlined"
                   />
                 </Box>
-                
+
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {request.description}
                 </Typography>
-                
+
                 <Divider sx={{ my: 2 }} />
-                
+
                 <Grid container spacing={2} sx={{ mb: 2 }}>
                   <Grid item xs={6} sm={3}>
                     <Typography variant="caption" display="block" color="text.secondary">
@@ -201,7 +190,7 @@ function BrowseRequests() {
                     </Typography>
                   </Grid>
                 </Grid>
-                
+
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Button
                     variant="contained"
