@@ -17,6 +17,9 @@ import BrowseRequests from './components/BrowseRequest';
 import MyRequests from './components/MyRequests';
 import MyDeliveries from './components/MyDeliveries';
 import Profile from "./components/Profile";
+import MessageHub from "./components/messagehub";       // Import Message Hub
+import Chat from "./components/messages";                   // Import 1-on-1 Chat
+
 function AppWrapper() {
   const { theme } = useThemeContext(); // Get theme from context
   
@@ -36,6 +39,8 @@ function AppWrapper() {
   <Route path="/browse-requests" element={<PrivateRoute><BrowseRequests /></PrivateRoute>} />
   <Route path="/my-requests" element={<PrivateRoute><MyRequests /></PrivateRoute>} />
   <Route path="/my-deliveries" element={<PrivateRoute><MyDeliveries /></PrivateRoute>} />
+  <Route path="/message-hub" element={<PrivateRoute><MessageHub /></PrivateRoute>} />
+            <Route path="/chat/:threadId" element={<PrivateRoute><Chat /></PrivateRoute>} />
 
           </Routes>
         </Box>

@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   Container, Typography, Grid, Card, CardContent, Button,
   Box, Chip, Divider, Paper, TextField, InputAdornment,
-  Select, MenuItem, FormControl, InputLabel
+  Select, MenuItem, FormControl, InputLabel, Snackbar, Alert
 } from '@mui/material';
 import { FlightLand, LocalShipping } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query,where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, getDoc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase'; // adjust path if needed
+import countries from 'i18n-iso-countries';
+import LuggageIcon from '@mui/icons-material/Luggage';
+countries.registerLocale(require('i18n-iso-countries/langs/en.json'));
+const countryList = Object.entries(countries.getNames("en")).map(([code, name]) => ({ code, name }));
 
 function BrowseRequests() {
   const { currentUser } = useAuth();
@@ -19,31 +23,41 @@ function BrowseRequests() {
     destinationCountry: '',
     maxWeight: ''
   });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   useEffect(() => {
-  const fetchRequests = async () => {
-    try {
-      const q = query(collection(db, 'items'), where('status', '==', 'open'));
-      const querySnapshot = await getDocs(q);
-      const data = [];
+    const fetchRequests = async () => {
+      try {
+        const q = query(collection(db, 'items'), where('status', '==', 'open'));
+        const querySnapshot = await getDocs(q);
+        const data = [];
 
-      querySnapshot.forEach(doc => {
-        const request = doc.data();
-        if (request.userEmail !== currentUser?.email) {
-          data.push({ id: doc.id, ...request });
-        }
-      });
+        querySnapshot.forEach(doc => {
+          const request = doc.data();
+          if (request.userEmail !== currentUser?.email) {
+            data.push({ id: doc.id, ...request });
+          }
+        });
 
-      setRequests(data);
-    } catch (err) {
-      console.error('Error fetching requests from Firestore:', err);
+        setRequests(data);
+      } catch (err) {
+        console.error('Error fetching requests from Firestore:', err);
+        setSnackbar({
+          open: true,
+          message: 'Error loading shipping requests',
+          severity: 'error'
+        });
+      }
+    };
+
+    if (currentUser) {
+      fetchRequests();
     }
-  };
-
-  if (currentUser) {
-    fetchRequests();
-  }
-}, [currentUser]);
+  }, [currentUser]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -53,9 +67,106 @@ function BrowseRequests() {
     }));
   };
 
-  const handleAcceptRequest = (requestId) => {
-    // Placeholder for accept logic
-    console.log('Accepting request:', requestId);
+  const createOrFetchConversation = async (acceptorId, acceptorEmail, requestOwner, requestOwnerEmail) => {
+    try {
+      // Create conversation ID using sorted participant IDs for consistency
+      const participantIds = [acceptorId, requestOwner].sort();
+      const messageThreadId = participantIds.join('_');
+      
+      console.log("Creating/fetching conversation with thread ID:", messageThreadId);
+      console.log("Participants:", participantIds);
+      console.log("Participant emails:", [acceptorEmail, requestOwnerEmail]);
+      
+      // Check if conversation exists
+      const convoRef = doc(db, 'messages', messageThreadId);
+      const convoSnap = await getDoc(convoRef);
+  
+      if (!convoSnap.exists()) {
+        console.log("Creating new conversation");
+        await setDoc(convoRef, {
+          participants: participantIds,
+          participantEmails: [acceptorEmail, requestOwnerEmail],
+          createdAt: serverTimestamp(),
+          // Add explicit fields to help with querying
+          acceptorId: acceptorId,
+          acceptorEmail: acceptorEmail,
+          requestOwner: requestOwner,
+          requestOwnerEmail: requestOwnerEmail
+        });
+      } else {
+        console.log("Conversation already exists");
+      }
+  
+      // Add first message
+      const messageRef = collection(db, `messages/${messageThreadId}/messages`);
+      await addDoc(messageRef, {
+        senderId: acceptorId,
+        senderEmail: acceptorEmail,
+        receiverId: requestOwner,
+        receiverEmail: requestOwnerEmail,
+        message: 'I have accepted your shipping request. Let\'s discuss the details.',
+        timestampCreatedAt: serverTimestamp(),
+      });
+  
+      console.log("Message sent successfully");
+      return messageThreadId;
+    } catch (error) {
+      console.error('Error creating conversation or sending message:', error);
+      throw error;
+    }
+  };
+
+  const handleAcceptRequest = async (requestId, requestOwner, requestOwnerEmail) => {
+    try {
+      console.log("Accepting request:", requestId);
+      console.log("Request owner:", requestOwner, requestOwnerEmail);
+      
+      const itemRef = doc(db, 'items', requestId); 
+      const { uid, email } = currentUser;
+  
+      console.log("Current user:", uid, email);
+      
+      // Update the item status
+      await updateDoc(itemRef, {
+        status: 'accepted',
+        acceptorId: uid,
+        acceptorEmail: email
+      });
+      
+      console.log("Item status updated to accepted");
+  
+      // Create or fetch conversation
+      const threadId = await createOrFetchConversation(uid, email, requestOwner, requestOwnerEmail);
+  
+      // Remove from the displayed requests
+      setRequests(prevRequests => prevRequests.filter(req => req.id !== requestId));
+
+      // Show success message
+      setSnackbar({
+        open: true,
+        message: 'Request accepted successfully! A conversation has been created.',
+        severity: 'success'
+      });
+
+      // Optionally navigate to the chat page
+      setTimeout(() => {
+        navigate('/messages');
+      }, 1500);
+    } catch (error) {
+      console.error('Error updating request status or creating conversation:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error accepting request. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({
+      ...prev,
+      open: false
+    }));
   };
 
   const filteredRequests = requests.filter(req => {
@@ -76,41 +187,91 @@ function BrowseRequests() {
       </Box>
 
       {/* Filters */}
-      <Paper elevation={0} sx={{ p: 3, mb: 4, border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: 2 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Origin Country</InputLabel>
-              <Select
-                name="originCountry"
-                label="Origin Country"
-                value={filters.originCountry}
-                onChange={handleFilterChange}
-              >
-                <MenuItem value="">All Countries</MenuItem>
-                <MenuItem value="USA">United States</MenuItem>
-                <MenuItem value="UK">United Kingdom</MenuItem>
-                <MenuItem value="UAE">United Arab Emirates</MenuItem>
-              </Select>
-            </FormControl>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 4, 
+          mb: 5, 
+          borderRadius: 4, 
+          backgroundColor: '#f9f9f9',
+          boxShadow: '0px 5px 15px rgba(0,0,0,0.1)',
+          transition: 'transform 0.3s',
+          '&:hover': {
+            transform: 'translateY(-3px)',
+            boxShadow: '0px 8px 20px rgba(0,0,0,0.15)',
+          },
+        }}
+      >
+        <Grid container spacing={3} alignItems="center">
+          <Grid item xs={12} md={5}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                border: '0px solid rgba(0, 0, 0, 0.2)', 
+                borderRadius: 2,
+                p: 1,
+                minWidth: 220, // Set initial width
+              }}
+            >
+              <LuggageIcon color="primary" sx={{ mr: 1 }} />
+              <FormControl fullWidth variant="outlined">
+                <InputLabel shrink>Origin Country</InputLabel>
+                <Select
+                  name="originCountry"
+                  label="Origin Country"
+                  value={filters.originCountry}
+                  onChange={handleFilterChange}
+                  displayEmpty
+                >
+                  <MenuItem value="">
+                    All Countries
+                  </MenuItem>
+                  {countryList.map((country) => (
+                    <MenuItem key={country.code} value={country.code}>
+                      {country.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Destination Country</InputLabel>
-              <Select
-                name="destinationCountry"
-                label="Destination Country"
-                value={filters.destinationCountry}
-                onChange={handleFilterChange}
-              >
-                <MenuItem value="">All Countries</MenuItem>
-                <MenuItem value="PK">Pakistan</MenuItem>
-                <MenuItem value="IN">India</MenuItem>
-                <MenuItem value="BD">Bangladesh</MenuItem>
-              </Select>
-            </FormControl>
+
+          <Grid item xs={12} md={5}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                border: '0px solid rgba(0, 0, 0, 0.2)', 
+                borderRadius: 2,
+                p: 1,
+                minWidth: 220,
+              }}
+            >
+              <LuggageIcon color="primary" sx={{ mr: 1 }} />
+              <FormControl fullWidth variant="outlined">
+                <InputLabel shrink>Destination Country</InputLabel>
+                <Select
+                  name="destinationCountry"
+                  label="Destination Country "
+                  value={filters.destinationCountry}
+                  onChange={handleFilterChange}
+                  displayEmpty
+                >
+                  <MenuItem value="">
+                    All Countries
+                  </MenuItem>
+                  {countryList.map((country) => (
+                    <MenuItem key={country.code} value={country.code}>
+                      {country.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
           </Grid>
-          <Grid item xs={12} md={4}>
+
+          <Grid item xs={12} md={2}>
             <TextField
               fullWidth
               label="Max Weight (kg)"
@@ -118,6 +279,7 @@ function BrowseRequests() {
               type="number"
               value={filters.maxWeight}
               onChange={handleFilterChange}
+              variant="outlined"
               InputProps={{
                 endAdornment: <InputAdornment position="end">kg</InputAdornment>,
               }}
@@ -128,6 +290,16 @@ function BrowseRequests() {
 
       {/* Requests List */}
       <Grid container spacing={3}>
+        {filteredRequests.length === 0 && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body1" color="text.secondary">
+                No shipping requests match your filters.
+              </Typography>
+            </Paper>
+          </Grid>
+        )}
+        
         {filteredRequests.map((request) => (
           <Grid item xs={12} key={request.id}>
             <Card sx={{ 
@@ -195,7 +367,7 @@ function BrowseRequests() {
                   <Button
                     variant="contained"
                     startIcon={<LocalShipping />}
-                    onClick={() => handleAcceptRequest(request.id)}
+                    onClick={() => handleAcceptRequest(request.id, request.userId, request.userEmail)}
                   >
                     Accept Delivery
                   </Button>
@@ -205,6 +377,23 @@ function BrowseRequests() {
           </Grid>
         ))}
       </Grid>
+
+      {/* Success/Error Notification */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }
