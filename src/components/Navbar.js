@@ -160,7 +160,21 @@ function Navbar() {
                   My Requests
                 </MenuItem>
                 <Divider />
-                <MenuItem onClick={handleLogout}>Logout</MenuItem>
+               
+                <MenuItem onClick={() => {
+  navigate('/my-requests');
+  handleClose();
+}}>
+  My Requests
+</MenuItem>
+<MenuItem onClick={() => {
+  navigate('/my-deliveries');
+  handleClose();
+}}>
+  My Deliveries
+  </MenuItem>
+  <Divider />
+  <MenuItem onClick={handleLogout}>Logout</MenuItem>
               </Menu>
             </>
           ) : (

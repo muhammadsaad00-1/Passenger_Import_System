@@ -12,7 +12,10 @@ import Signup from "./components/auth/Signup";
 import Dashboard from './components/Dashboard';
 import Navbar from './components/Navbar';
 import { Box } from '@mui/material';
-
+import CreateRequest from './components/CreateRequest';
+import BrowseRequests from './components/BrowseRequest';
+import MyRequests from './components/MyRequests';
+import MyDeliveries from './components/MyDeliveries';
 function AppWrapper() {
   const { theme } = useThemeContext(); // Get theme from context
   
@@ -23,10 +26,15 @@ function AppWrapper() {
         <Navbar />
         <Box component="main" sx={{ flexGrow: 1 }}>
           <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
-            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/login" element={<Login />} />
+  <Route path="/signup" element={<Signup />} />
+  <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+  <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+  <Route path="/create-request" element={<PrivateRoute><CreateRequest /></PrivateRoute>} />
+  <Route path="/browse-requests" element={<PrivateRoute><BrowseRequests /></PrivateRoute>} />
+  <Route path="/my-requests" element={<PrivateRoute><MyRequests /></PrivateRoute>} />
+  <Route path="/my-deliveries" element={<PrivateRoute><MyDeliveries /></PrivateRoute>} />
+
           </Routes>
         </Box>
       </Box>
