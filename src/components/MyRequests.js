@@ -56,7 +56,7 @@ function MyRequests() {
 
   const filteredRequests = requests.filter(request => {
     if (tabValue === 0) return request.status === 'open';
-    if (tabValue === 1) return request.status === 'assigned' || request.status === 'in-transit';
+    if (tabValue === 1) return request.status === 'accepted' || request.status === 'in-transit';
     return true;
   });
 
@@ -64,7 +64,7 @@ function MyRequests() {
     switch(status) {
       case 'open':
         return 'Pending';
-      case 'assigned':
+      case 'accepted':
         return 'Accepted';
       case 'in-transit':
         return 'In Transit';
@@ -81,7 +81,7 @@ function MyRequests() {
     switch(status) {
       case 'open':
         return 'default';
-      case 'assigned':
+      case 'accepted':
         return 'primary';
       case 'in-transit':
         return 'secondary';

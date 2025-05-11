@@ -150,12 +150,7 @@ function Navbar() {
                                 }}>
                                     My Profile
                                 </MenuItem>
-                                <MenuItem onClick={() => {
-                                    navigate('/requests');
-                                    handleClose();
-                                }}>
-                                    My Requests
-                                </MenuItem>
+                                
 
                                 <Divider />
                                 <MenuItem onClick={() => {
