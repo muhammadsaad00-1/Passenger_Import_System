@@ -148,10 +148,7 @@ function BrowseRequests() {
         severity: 'success'
       });
 
-      // Optionally navigate to the chat page
-      setTimeout(() => {
-        navigate('/messages');
-      }, 1500);
+     
     } catch (error) {
       console.error('Error updating request status or creating conversation:', error);
       setSnackbar({

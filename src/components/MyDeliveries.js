@@ -11,52 +11,90 @@ import {
   Paper,
   Tabs,
   Tab,
-  Button  // Added this import
+  Button,
+  CircularProgress
 } from '@mui/material';
 import { FlightLand, LocalShipping, CheckCircle, HourglassEmpty } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 function MyDeliveries() {
   const { currentUser } = useAuth();
   const [deliveries, setDeliveries] = useState([]);
   const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  // TODO: Replace with actual data fetching from Firebase
   useEffect(() => {
-    // Mock data
-    const mockDeliveries = [
-      {
-        id: '1',
-        itemName: 'iPhone 14 Pro',
-        status: 'pending',
-        originCountry: 'USA',
-        destinationCountry: 'PK',
-        offerPrice: 50,
-        requesterName: 'Ali Khan',
-        requesterContact: 'ali@example.com',
-        createdAt: new Date()
-      },
-      {
-        id: '2',
-        itemName: 'Designer Handbag',
-        status: 'completed',
-        originCountry: 'UK',
-        destinationCountry: 'PK',
-        offerPrice: 80,
-        requesterName: 'Sara Ahmed',
-        requesterContact: 'sara@example.com',
-        createdAt: new Date(),
-        completedAt: new Date()
+    const fetchDeliveries = async () => {
+      try {
+        if (!currentUser) return;
+        
+        setLoading(true);
+        const deliveriesRef = collection(db, 'items');
+        const q = query(deliveriesRef, where('acceptorId', '==', currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        
+        const deliveriesData = [];
+        querySnapshot.forEach((doc) => {
+          deliveriesData.push({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+            updatedAt: doc.data().updatedAt?.toDate()
+          });
+        });
+        
+        setDeliveries(deliveriesData);
+      } catch (error) {
+        console.error('Error fetching deliveries:', error);
+      } finally {
+        setLoading(false);
       }
-    ];
-    setDeliveries(mockDeliveries);
-  }, []);
+    };
+
+    fetchDeliveries();
+  }, [currentUser]);
 
   const filteredDeliveries = deliveries.filter(delivery => {
-    if (tabValue === 0) return delivery.status === 'pending';
-    if (tabValue === 1) return delivery.status === 'completed';
+    if (tabValue === 0) return delivery.status === 'accepted' || delivery.status === 'pending';
+    if (tabValue === 1) return delivery.status === 'completed' || delivery.status === 'delivered';
     return true;
   });
+
+  const handleMarkAsDelivered = async (deliveryId) => {
+    try {
+      setLoading(true);
+      const deliveryRef = doc(db, 'items', deliveryId);
+      
+      await updateDoc(deliveryRef, {
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+
+      // Update local state to reflect the change
+      setDeliveries(prevDeliveries => 
+        prevDeliveries.map(delivery => 
+          delivery.id === deliveryId 
+            ? { ...delivery, status: 'completed', updatedAt: new Date() } 
+            : delivery
+        )
+      );
+    } catch (error) {
+      console.error('Error marking as delivered:', error);
+      alert('Failed to update delivery status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 6, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 6 }}>
@@ -90,8 +128,8 @@ function MyDeliveries() {
                       {delivery.itemName}
                     </Typography>
                     <Chip 
-                      label={delivery.status === 'pending' ? 'Active' : 'Completed'} 
-                      color={delivery.status === 'pending' ? 'primary' : 'default'} 
+                      label={delivery.status === 'accepted' || delivery.status === 'pending' ? 'Active' : 'Completed'} 
+                      color={delivery.status === 'accepted' || delivery.status === 'pending' ? 'primary' : 'default'} 
                     />
                   </Box>
                   
@@ -135,16 +173,20 @@ function MyDeliveries() {
                     Requester Details:
                   </Typography>
                   <Typography variant="body2">
-                    Name: {delivery.requesterName}
+                    Email: {delivery.userEmail}
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    Contact: {delivery.requesterContact}
+                    Description: {delivery.description}
                   </Typography>
                   
-                  {delivery.status === 'pending' && (
+                  {(delivery.status === 'accepted' || delivery.status === 'pending') && (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button variant="contained">
-                        Mark as Delivered
+                      <Button 
+                        variant="contained"
+                        onClick={() => handleMarkAsDelivered(delivery.id)}
+                        disabled={loading}
+                      >
+                        {loading ? 'Updating...' : 'Mark as Delivered'}
                       </Button>
                     </Box>
                   )}

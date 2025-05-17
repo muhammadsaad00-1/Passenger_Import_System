@@ -19,7 +19,6 @@ import MyDeliveries from './components/MyDeliveries';
 import Profile from "./components/Profile";
 import MessageHub from "./components/messagehub";       // Import Message Hub
 import Chat from "./components/messages";                   // Import 1-on-1 Chat
-import GeminiChat from "./components/GeminiChat";
 
 function AppWrapper() {
   const { theme } = useThemeContext(); // Get theme from context
@@ -42,7 +41,6 @@ function AppWrapper() {
   <Route path="/my-deliveries" element={<PrivateRoute><MyDeliveries /></PrivateRoute>} />
   <Route path="/message-hub" element={<PrivateRoute><MessageHub /></PrivateRoute>} />
             <Route path="/chat/:threadId" element={<PrivateRoute><Chat /></PrivateRoute>} />
-            <Route path="/geminichat" element={<PrivateRoute><GeminiChat /></PrivateRoute>} />
 
           </Routes>
         </Box>
