@@ -175,13 +175,6 @@ function Navbar() {
                                     Messages
                                 </MenuItem>
 
-                                <MenuItem onClick={() => {
-                                    navigate('/geminichat');
-                                    handleClose();
-                                }}>
-                                    Chatbot
-                                </MenuItem>
-
                                 <Divider />
                                 <MenuItem onClick={handleLogout}>Logout</MenuItem>
                             </Menu>
