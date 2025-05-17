@@ -21,7 +21,8 @@ import {
   Divider,
   TextField,
   InputAdornment,
-  IconButton
+  IconButton,
+  CircularProgress
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -33,6 +34,7 @@ import {
   Send
 } from '@mui/icons-material';
 import backgroundImage from '../assests/images/img1.webp';
+import { askGemini } from '../services/api';
 
 function Dashboard() {
   const { currentUser } = useAuth();
@@ -40,6 +42,8 @@ function Dashboard() {
   const [faqOpen, setFaqOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState(null);
   const [questionText, setQuestionText] = useState('');
+  const [geminiResponse, setGeminiResponse] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const faqs = [
     {
@@ -97,11 +101,19 @@ function Dashboard() {
     setActiveFaq(activeFaq === index ? null : index);
   };
 
-  const handleAskQuestion = () => {
-    // Clear the text field
-    setQuestionText('');
-    // Here you would typically handle the question submission
-    console.log("Question submitted:", questionText);
+  const handleAskQuestion = async () => {
+    if (!questionText.trim()) return;
+    
+    setIsLoading(true);
+    try {
+      const aiResponse = await askGemini(questionText);
+      setGeminiResponse(aiResponse);
+    } catch (error) {
+      setGeminiResponse('Sorry, I encountered an error while processing your question. Please try again later.');
+      console.error("Error querying Gemini:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -348,41 +360,95 @@ function Dashboard() {
             ))}
           </List>
           
-          {/* Question Input Field */}
-          <Box sx={{ mt: 4, display: 'flex', alignItems: 'center' }}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Ask if you have any other questions..."
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
+          {/* Gemini AI Chat Section */}
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+              Ask Gemini AI
+            </Typography>
+            
+            {/* Question Input Field */}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Ask if you have any other questions..."
+                value={questionText}
+                onChange={(e) => setQuestionText(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && questionText.trim() !== '') {
+                    handleAskQuestion();
+                  }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.8)
+                  }
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        edge="end"
+                        color="primary"
+                        onClick={handleAskQuestion}
+                        disabled={!questionText.trim() || isLoading}
+                        sx={{
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          '&:hover': {
+                            backgroundColor: alpha(theme.palette.primary.main, 0.2)
+                          }
+                        }}
+                      >
+                        {isLoading ? <CircularProgress size={20} /> : <Send />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Box>
+            
+            {/* Gemini Response Display */}
+            {(geminiResponse || isLoading) && (
+              <Paper
+                elevation={0}
+                sx={{
+                  mt: 3,
+                  p: 3,
                   borderRadius: 2,
-                  backgroundColor: alpha(theme.palette.background.paper, 0.8)
-                }
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      edge="end"
-                      color="primary"
-                      onClick={handleAskQuestion}
-                      disabled={!questionText.trim()}
-                      sx={{
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.primary.main, 0.2)
-                        }
-                      }}
-                    >
-                      <Send />
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
-            />
+                  backgroundColor: alpha(theme.palette.primary.light, 0.05),
+                  border: '1px solid ' + alpha(theme.palette.primary.main, 0.1)
+                }}
+              >
+                <Box display="flex" alignItems="center" mb={1}>
+                  <Avatar 
+                    sx={{ 
+                      bgcolor: theme.palette.secondary.main,
+                      mr: 1.5,
+                      width: 28,
+                      height: 28,
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    AI
+                  </Avatar>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Your Personalized AI
+                  </Typography>
+                </Box>
+                
+                {isLoading ? (
+                  <Box display="flex" alignItems="center" justifyContent="center" py={2}>
+                    <CircularProgress size={24} sx={{ mr: 2 }} />
+                    <Typography>Thinking...</Typography>
+                  </Box>
+                ) : (
+                  <Typography variant="body1" sx={{ pl: 4.5 }}>
+                    {geminiResponse}
+                  </Typography>
+                )}
+              </Paper>
+            )}
           </Box>
         </DialogContent>
       </Dialog>
